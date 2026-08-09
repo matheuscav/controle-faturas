@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Controle de Faturas</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        max-width: 700px;
+        margin: 40px auto;
+        padding: 0 20px;
+        background: #f5f5f5;
+    }
+    h1 { color: #222; }
+    .abas { display: flex; margin-bottom: 20px; }
+    .aba-botao {
+        flex: 1;
+        padding: 12px;
+        text-align: center;
+        cursor: pointer;
+        background: #ddd;
+        border: none;
+        font-size: 15px;
+    }
+    .aba-botao.ativa { background: #2b6cb0; color: white; }
+    .painel { display: none; background: white; padding: 20px; border-radius: 6px; }
+    .painel.ativo { display: block; }
+    label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
+    input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button.enviar {
+        margin-top: 16px; padding: 10px 20px; background: #2b6cb0;
+        color: white; border: none; border-radius: 4px; cursor: pointer;
+    }
+    button.enviar:hover { background: #1e4e8c; }
+    .mensagem { margin-top: 12px; padding: 10px; border-radius: 4px; font-size: 14px; }
+    .mensagem.sucesso { background: #d4edda; color: #155724; }
+    .mensagem.erro { background: #f8d7da; color: #721c24; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #eee; }
+
+    .cards { display: flex; gap: 12px; flex-wrap: wrap; }
+    .card {
+        flex: 1; min-width: 140px; background: #fff; border-radius: 6px;
+        padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .card .rotulo { font-size: 12px; color: #666; text-transform: uppercase; }
+    .card .valor { font-size: 24px; font-weight: bold; margin-top: 4px; color: #2b6cb0; }
+    .card.alerta .valor { color: #c0392b; }
+    .grafico-container { background: white; padding: 16px; border-radius: 6px; margin-top: 16px; }
+    .lista-alertas { list-style: none; padding: 0; margin-top: 16px; }
+    .lista-alertas li {
+        background: white; padding: 10px 14px; border-radius: 4px; margin-bottom: 6px;
+        display: flex; justify-content: space-between; font-size: 13px;
+        border-left: 4px solid #f0ad4e;
+    }
+    .lista-alertas li.atrasada { border-left-color: #c0392b; }
+
+    .filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+    .filtros div { flex: 1; min-width: 130px; }
+    .filtros label { margin-top: 0; }
+    .btn-secundario {
+        padding: 8px 14px; background: #eee; border: 1px solid #ccc; border-radius: 4px;
+        cursor: pointer; font-size: 13px;
+    }
+    .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+    .badge.pendente { background: #fff3cd; color: #856404; }
+    .badge.pago { background: #d4edda; color: #155724; }
+    .badge.atrasado { background: #f8d7da; color: #721c24; }
+    .btn-acao {
+        padding: 4px 10px; margin-right: 4px; border: none; border-radius: 4px;
+        cursor: pointer; font-size: 12px; color: white;
+    }
+    .btn-pagar { background: #28a745; }
+    .btn-apagar { background: #dc3545; }
+</style>
+</head>
+<body>
+
+<h1>Controle de Faturas</h1>
+
+<div class="abas">
+    <button class="aba-botao" onclick="mostrarAba('dashboard')">Dashboard</button>
+    <button class="aba-botao ativa" onclick="mostrarAba('empresa')">Cadastrar Empresa</button>
+    <button class="aba-botao" onclick="mostrarAba('fatura')">Cadastrar Fatura</button>
+    <button class="aba-botao" onclick="mostrarAba('consulta')">Consultar Faturas</button>
+</div>
+
+<!-- ABA CONSULTAR FATURAS -->
+<div id="painel-consulta" class="painel">
+    <div class="filtros">
+        <div>
+            <label>Número da fatura</label>
+            <input type="text" id="filtro_numero" placeholder="Buscar por número">
+        </div>
+        <div>
+            <label>Empresa</label>
+            <select id="filtro_empresa">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div>
+            <label>Status</label>
+            <select id="filtro_status">
+                <option value="">Todos</option>
+                <option value="pendente">Pendente</option>
+                <option value="pago">Pago</option>
+                <option value="atrasado">Atrasado</option>
+            </select>
+        </div>
+        <div>
+            <label>De</label>
+            <input type="date" id="filtro_data_inicio">
+        </div>
+        <div>
+            <label>Até</label>
+            <input type="date" id="filtro_data_fim">
+        </div>
+        <div style="flex: 0;">
+            <button class="btn-secundario" onclick="buscarFaturas()">Filtrar</button>
+        </div>
+        <div style="flex: 0;">
+            <button class="btn-secundario" onclick="limparFiltros()">Limpar</button>
+        </div>
+    </div>
+
+    <table id="tabela-consulta">
+        <thead>
+            <tr>
+                <th>Fatura</th><th>Número</th><th>Empresa</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- ABA DASHBOARD -->
+<div id="painel-dashboard" class="painel">
+    <div class="cards">
+        <div class="card">
+            <div class="rotulo">Total a pagar (mês)</div>
+            <div class="valor" id="card-total-mes">R$ 0,00</div>
+        </div>
+        <div class="card alerta">
+            <div class="rotulo">Vencendo em 7 dias</div>
+            <div class="valor" id="card-vencendo">0</div>
+        </div>
+        <div class="card alerta">
+            <div class="rotulo">Atrasadas</div>
+            <div class="valor" id="card-atrasadas">0</div>
+        </div>
+        <div class="card">
+            <div class="rotulo">Total de faturas</div>
+            <div class="valor" id="card-total-faturas">0</div>
+        </div>
+    </div>
+
+    <div class="grafico-container">
+        <h3 style="margin-top:0;">Gastos por empresa</h3>
+        <canvas id="grafico-empresas" height="100"></canvas>
+    </div>
+
+    <h3>Alertas de vencimento</h3>
+    <ul class="lista-alertas" id="lista-alertas"></ul>
+</div>
+
+<!-- ABA EMPRESA -->
+<div id="painel-empresa" class="painel ativo">
+    <form id="form-empresa">
+        <label>Nome da empresa</label>
+        <input type="text" id="nome_empresa" required>
+
+        <label>CNPJ</label>
+        <input type="text" id="cnpj" placeholder="00.000.000/0000-00" required>
+
+        <button type="submit" class="enviar">Cadastrar empresa</button>
+    </form>
+    <div id="msg-empresa"></div>
+
+    <table id="tabela-empresas">
+        <thead><tr><th>Empresa</th><th>CNPJ</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- ABA FATURA -->
+<div id="painel-fatura" class="painel">
+    <form id="form-fatura">
+        <label>Nome da fatura</label>
+        <input type="text" id="nome_fatura" required>
+
+        <label>Número da fatura/boleto</label>
+        <input type="text" id="numero_fatura" placeholder="Opcional">
+
+        <label>Empresa</label>
+        <select id="id_empresa" required></select>
+
+        <label>Data de vencimento</label>
+        <input type="date" id="data_vencimento" required>
+
+        <label>Valor (R$)</label>
+        <input type="number" step="0.01" id="valor">
+
+        <button type="submit" class="enviar">Salvar fatura</button>
+    </form>
+    <div id="msg-fatura"></div>
+
+    <table id="tabela-faturas">
+        <thead><tr><th>Fatura</th><th>Empresa</th><th>Vencimento</th><th>Valor</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const API = 'http://localhost:3000/api';
+let graficoEmpresas = null;
+
+function mostrarAba(nome) {
+    document.querySelectorAll('.painel').forEach(p => p.classList.remove('ativo'));
+    document.querySelectorAll('.aba-botao').forEach(b => b.classList.remove('ativa'));
+    document.getElementById('painel-' + nome).classList.add('ativo');
+    event.target.classList.add('ativa');
+    if (nome === 'fatura') carregarEmpresasNoSelect();
+    if (nome === 'dashboard') carregarDashboard();
+    if (nome === 'consulta') { carregarEmpresasNoFiltro(); buscarFaturas(); }
+}
+
+// ---------- DASHBOARD ----------
+async function carregarDashboard() {
+    // Cards de resumo
+    const respResumo = await fetch(`${API}/dashboard/resumo`);
+    const resumo = await respResumo.json();
+    document.getElementById('card-total-mes').textContent =
+        'R$ ' + Number(resumo.total_mes).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    document.getElementById('card-vencendo').textContent = resumo.vencendo_7_dias;
+    document.getElementById('card-atrasadas').textContent = resumo.atrasadas;
+    document.getElementById('card-total-faturas').textContent = resumo.total_faturas;
+
+    // Gráfico por empresa
+    const respEmpresas = await fetch(`${API}/dashboard/por-empresa`);
+    const dadosEmpresas = await respEmpresas.json();
+    const ctx = document.getElementById('grafico-empresas').getContext('2d');
+
+    if (graficoEmpresas) graficoEmpresas.destroy(); // evita duplicar o gráfico ao trocar de aba
+
+    graficoEmpresas = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dadosEmpresas.map(e => e.nome_empresa),
+            datasets: [{
+                label: 'Total gasto (R$)',
+                data: dadosEmpresas.map(e => e.total),
+                backgroundColor: '#2b6cb0'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // Lista de alertas
+    const respAlertas = await fetch(`${API}/dashboard/alertas`);
+    const alertas = await respAlertas.json();
+    const lista = document.getElementById('lista-alertas');
+    lista.innerHTML = '';
+
+    if (alertas.length === 0) {
+        lista.innerHTML = '<li>Nenhuma fatura vencendo nos próximos 7 dias. 🎉</li>';
+    } else {
+        alertas.forEach(a => {
+            const classe = a.situacao === 'atrasada' ? 'atrasada' : '';
+            const dataFormatada = new Date(a.data_vencimento).toLocaleDateString('pt-BR');
+            const rotulo = a.situacao === 'atrasada' ? 'ATRASADA' : 'vence em breve';
+            lista.innerHTML += `<li class="${classe}">
+                <span>${a.nome_fatura} — ${a.nome_empresa}</span>
+                <span>${dataFormatada} (${rotulo})</span>
+            </li>`;
+        });
+    }
+}
+
+function mostrarMensagem(elId, texto, tipo) {
+    const el = document.getElementById(elId);
+    el.textContent = texto;
+    el.className = 'mensagem ' + tipo;
+    setTimeout(() => { el.textContent = ''; el.className = ''; }, 4000);
+}
+
+// ---------- EMPRESA ----------
+document.getElementById('form-empresa').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nome_empresa = document.getElementById('nome_empresa').value;
+    const cnpj = document.getElementById('cnpj').value;
+
+    try {
+        const resp = await fetch(`${API}/empresas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome_empresa, cnpj })
+        });
+        const dados = await resp.json();
+
+        if (!resp.ok) {
+            mostrarMensagem('msg-empresa', dados.erro, 'erro');
+            return;
+        }
+        mostrarMensagem('msg-empresa', dados.mensagem, 'sucesso');
+        document.getElementById('form-empresa').reset();
+        carregarEmpresas();
+    } catch (err) {
+        mostrarMensagem('msg-empresa', 'Erro de conexão com o servidor.', 'erro');
+    }
+});
+
+async function carregarEmpresas() {
+    const resp = await fetch(`${API}/empresas`);
+    const empresas = await resp.json();
+    const tbody = document.querySelector('#tabela-empresas tbody');
+    tbody.innerHTML = '';
+    empresas.forEach(emp => {
+        const cnpjFormatado = emp.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+        tbody.innerHTML += `<tr><td>${emp.nome_empresa}</td><td>${cnpjFormatado}</td></tr>`;
+    });
+}
+
+async function carregarEmpresasNoSelect() {
+    const resp = await fetch(`${API}/empresas`);
+    const empresas = await resp.json();
+    const select = document.getElementById('id_empresa');
+    select.innerHTML = '';
+    empresas.forEach(emp => {
+        select.innerHTML += `<option value="${emp.id_empresa}">${emp.nome_empresa}</option>`;
+    });
+}
+
+// ---------- CONSULTAR FATURAS ----------
+async function carregarEmpresasNoFiltro() {
+    const resp = await fetch(`${API}/empresas`);
+    const empresas = await resp.json();
+    const select = document.getElementById('filtro_empresa');
+    select.innerHTML = '<option value="">Todas</option>';
+    empresas.forEach(emp => {
+        select.innerHTML += `<option value="${emp.id_empresa}">${emp.nome_empresa}</option>`;
+    });
+}
+
+function limparFiltros() {
+    document.getElementById('filtro_numero').value = '';
+    document.getElementById('filtro_empresa').value = '';
+    document.getElementById('filtro_status').value = '';
+    document.getElementById('filtro_data_inicio').value = '';
+    document.getElementById('filtro_data_fim').value = '';
+    buscarFaturas();
+}
+
+async function buscarFaturas() {
+    const numero_fatura = document.getElementById('filtro_numero').value;
+    const id_empresa = document.getElementById('filtro_empresa').value;
+    const status = document.getElementById('filtro_status').value;
+    const data_inicio = document.getElementById('filtro_data_inicio').value;
+    const data_fim = document.getElementById('filtro_data_fim').value;
+
+    const params = new URLSearchParams();
+    if (numero_fatura) params.append('numero_fatura', numero_fatura);
+    if (id_empresa) params.append('id_empresa', id_empresa);
+    if (status) params.append('status', status);
+    if (data_inicio) params.append('data_inicio', data_inicio);
+    if (data_fim) params.append('data_fim', data_fim);
+
+    const resp = await fetch(`${API}/faturas/consulta?${params.toString()}`);
+    const faturas = await resp.json();
+
+    const tbody = document.querySelector('#tabela-consulta tbody');
+    tbody.innerHTML = '';
+
+    if (faturas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">Nenhuma fatura encontrada.</td></tr>';
+        return;
+    }
+
+    faturas.forEach(f => {
+        const dataFormatada = new Date(f.data_vencimento).toLocaleDateString('pt-BR');
+        const valorFormatado = f.valor ? 'R$ ' + Number(f.valor).toFixed(2) : '-';
+        tbody.innerHTML += `<tr>
+            <td>${f.nome_fatura}</td>
+            <td>${f.numero_fatura || '-'}</td>
+            <td>${f.nome_empresa}</td>
+            <td>${dataFormatada}</td>
+            <td>${valorFormatado}</td>
+            <td><span class="badge ${f.status_pagamento}">${f.status_pagamento}</span></td>
+            <td>
+                ${f.status_pagamento !== 'pago' ? `<button class="btn-acao btn-pagar" onclick="marcarComoPago(${f.id_fatura})">Pagar</button>` : ''}
+                <button class="btn-acao btn-apagar" onclick="apagarFatura(${f.id_fatura})">Apagar</button>
+            </td>
+        </tr>`;
+    });
+}
+
+async function marcarComoPago(id) {
+    await fetch(`${API}/faturas/${id}/pagar`, { method: 'PATCH' });
+    buscarFaturas();
+}
+
+async function apagarFatura(id) {
+    if (!confirm('Tem certeza que deseja apagar essa fatura? Essa ação não pode ser desfeita.')) return;
+    await fetch(`${API}/faturas/${id}`, { method: 'DELETE' });
+    buscarFaturas();
+}
+document.getElementById('form-fatura').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nome_fatura = document.getElementById('nome_fatura').value;
+    const numero_fatura = document.getElementById('numero_fatura').value;
+    const id_empresa = document.getElementById('id_empresa').value;
+    const data_vencimento = document.getElementById('data_vencimento').value;
+    const valor = document.getElementById('valor').value;
+
+    try {
+        const resp = await fetch(`${API}/faturas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome_fatura, numero_fatura, id_empresa, data_vencimento, valor })
+        });
+        const dados = await resp.json();
+
+        if (!resp.ok) {
+            mostrarMensagem('msg-fatura', dados.erro, 'erro');
+            return;
+        }
+        mostrarMensagem('msg-fatura', dados.mensagem, 'sucesso');
+        document.getElementById('form-fatura').reset();
+        carregarFaturas();
+    } catch (err) {
+        mostrarMensagem('msg-fatura', 'Erro de conexão com o servidor.', 'erro');
+    }
+});
+
+async function carregarFaturas() {
+    const resp = await fetch(`${API}/faturas`);
+    const faturas = await resp.json();
+    const tbody = document.querySelector('#tabela-faturas tbody');
+    tbody.innerHTML = '';
+    faturas.forEach(f => {
+        tbody.innerHTML += `<tr>
+            <td>${f.nome_fatura}</td>
+            <td>${f.nome_empresa}</td>
+            <td>${new Date(f.data_vencimento).toLocaleDateString('pt-BR')}</td>
+            <td>${f.valor ? 'R$ ' + Number(f.valor).toFixed(2) : '-'}</td>
+        </tr>`;
+    });
+}
+
+// Carrega dados iniciais
+carregarEmpresas();
+carregarFaturas();
+</script>
+
+</body>
+</html>
